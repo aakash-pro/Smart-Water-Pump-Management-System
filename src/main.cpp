@@ -11,11 +11,13 @@
 #include "dashboard.h"
 #include "pumpcontrol.h"
 #include "tankfullprotection.h"
+#include "webserver.h"
+
 
 
 
 void setup()
-{
+{ 
   strip.begin();
   strip.show();
   strip.setPixelColor(0, strip.Color(0, 0, 0));
@@ -46,6 +48,7 @@ void setup()
   u8g2.setFontMode(1);
   mui.begin(u8g2, fds_data, muif_list, sizeof(muif_list) / sizeof(muif_t));
   loadValuesFromEEPROM();
+  initWebServer();
   initialization();
 
 }
@@ -138,8 +141,10 @@ void loop()
       showDashboard();
       updateledstrip();
       checktankfullprotection();
-      
   }
+  
+  // Handle web server requests
+  handleWebServer();
 }
 
 

@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<title>Industrial Water Controller</title>
+
+<link rel="stylesheet" href="style.css">
+
+</head>
+
+<body>
+
+<header>
+
+<div class="title">WATER CONTROL SYSTEM</div>
+
+<div class="statusbar">
+
+<span id="wifi" class="badge green">ONLINE</span>
+
+<span id="pumpBadge" class="badge gray">PUMP</span>
+
+<span id="tankBadge" class="badge gray">TANK</span>
+
+</div>
+
+</header>
+
+
+<div class="main">
+
+<div class="tankSection">
+
+<div class="tank">
+
+<div id="tankFill" class="tankFill"></div>
+
+</div>
+
+<div id="levelText">0%</div>
+
+</div>
+
+
+<div class="metrics">
+
+<div class="card">
+
+<div>Flow</div>
+<div id="currentLPM">0</div>
+
+</div>
+
+<div class="card">
+
+<div>Power</div>
+<div id="power">0</div>
+
+</div>
+
+<div class="card">
+
+<div>Voltage</div>
+<div id="voltage">0</div>
+
+</div>
+
+<div class="card">
+
+<div>Energy</div>
+<div id="todayEnergy">0</div>
+
+</div>
+
+</div>
+
+
+<div class="controls">
+
+<label>
+
+Dry Run
+
+<input type="checkbox"
+id="dry_run_cutoff_protection"
+data-var="dry_run_cutoff_protection">
+
+</label>
+
+<label>
+
+Tank Full
+
+<input type="checkbox"
+id="tank_full_cutoff_protection"
+data-var="tank_full_cutoff_protection">
+
+</label>
+
+</div>
+
+</div>
+
+
+<footer>
+
+Last Update:
+<span id="lastUpdate">--</span>
+
+<a href="/ota.html">OTA</a>
+
+</footer>
+
+
+<script src="app.js"></script>
+
+</body>
+</html>

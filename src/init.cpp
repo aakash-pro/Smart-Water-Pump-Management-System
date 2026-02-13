@@ -12,8 +12,25 @@ void showLoadingBar(uint8_t percent, const char *status)
       u8g2.setFont(u8g2_font_6x10_tr);
       u8g2.drawStr(0, 7, "Automatic Water Pump");
       u8g2.drawStr(0, 15, "Controller");
+      if (WiFi.SSID().length() == 0)
+      {
+        u8g2.drawStr(0, 26, "Setup WiFi Connection");
+        u8g2.drawStr(0, 35, "Connect :192.168.4.1");
+      }
+      else
+      {
+        u8g2.drawStr(0, 26, "SSID:");
+        u8g2.drawStr(36, 26, WiFi.SSID().c_str());
+      }
+      if (WiFi.SSID().length() == 0)
+      {
+       u8g2.drawStr(0, 50, "Status: No Network");
+      }
+      else
+      {
       u8g2.drawStr(0, 50, "Status:");
       u8g2.drawStr(42, 50, status);
+    }
       int boxwidth = (frame * 107) / 100;
       u8g2.drawFrame(0, 58, 108, 6);
       u8g2.drawBox(0, 59, boxwidth, 4);
@@ -52,6 +69,7 @@ const char *wifiStatusToString(wl_status_t status)
 
 bool connectWifi(uint32_t timeout_ms)
 {
+  
   
   res = wm.autoConnect("Pump Controller", "12345678");
   if (!res)
@@ -176,7 +194,7 @@ void comm_error(int wifiFail, int plugFail, int tankFail)
 void initialization()
 {
 
-    showLoadingBar(5, "Booting");
+    showLoadingBar(0, "Booting");
   if (!connectWifi())
   {
     showLoadingBar(15, "WiFi Failed");
