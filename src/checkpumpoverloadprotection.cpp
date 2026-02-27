@@ -5,6 +5,7 @@ void checkpumpoverloadprotection()
   static unsigned long overloadDetectedTime = 0;
   static bool overloadDelayActive = false;
   static unsigned long lastBeepTime = 0;
+  static bool overloadProtectionTripped = false;
 
   unsigned int overloadThreshold =
       overload_cutoff_power_1 * 1000 +
@@ -12,7 +13,7 @@ void checkpumpoverloadprotection()
       overload_cutoff_power_3 * 10 +
       overload_cutoff_power_4;
 
-  if (overload_cutoff_protection && pump_running && power >= overloadThreshold)
+  if (overload_cutoff_protection && pump_running && power > overloadThreshold)
   {
     if (!overloadDelayActive)
     {
@@ -20,21 +21,28 @@ void checkpumpoverloadprotection()
       overloadDelayActive = true;
     }
 
-    if (overloadDelayActive && (millis() - lastBeepTime >= 100))
+    if (overloadDelayActive && !beepCtx.active && (millis() - lastBeepTime >= 100))
     {
       beep(40);
       lastBeepTime = millis();
     }
 
-    // Check delay timeout
     if (millis() - overloadDetectedTime >= (unsigned long)overload_cutoff_delay * 1000)
     {
-      turnOffPumpAsync();
+      if (!overloadProtectionTripped)
+      {
+        turnOffPumpAsync();
+        overloadProtectionTripped = true;
+      }
       overloadDelayActive = false;
     }
+
+
+    
   }
   else
   {
     overloadDelayActive = false;
+    if (!pump_running) overloadProtectionTripped = false;
   }
 }

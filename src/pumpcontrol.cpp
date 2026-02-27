@@ -2,88 +2,69 @@
 #include "pumpcontrol.h"
 #define RELAY_PORT 80
 
-AsyncClient pumpClient;
-
-struct PumpContext {
-    bool requestInProgress = false;
-    bool responseReceived = false;
-    char buffer[256];
-    size_t len = 0;
-};
-
+static AsyncClient pumpClient;
 PumpContext pumpCtx;
 
-void pumpRequest(const char* command)
-{
-    if (pumpCtx.requestInProgress)
-        return;
-
-    if (WiFi.status() != WL_CONNECTED)
-        return;
-
-    pumpCtx.requestInProgress = true;
-    pumpCtx.responseReceived = false;
-    pumpCtx.len = 0;
-
-    pumpClient.onConnect([](void* arg, AsyncClient* client)
-    {
+void initPumpClient() {
+    pumpClient.onConnect([](void* arg, AsyncClient* client) {
+        PumpContext* ctx = (PumpContext*)arg;
         char request[128];
-
         snprintf(request, sizeof(request),
             "GET /cm?cmnd=Power%%20%s HTTP/1.1\r\n"
             "Host: %s\r\n"
             "Connection: close\r\n\r\n",
-            (const char*)arg,
-            PUMP_IP
-        );
-
+            ctx->command, PUMP_IP);
         client->write(request);
+    }, &pumpCtx);
 
-    }, (void*)command);
+    pumpClient.onData([](void* arg, AsyncClient* client, void* data, size_t len) {
+        PumpContext* ctx = (PumpContext*)arg;
+        if (ctx->len + len >= sizeof(ctx->buffer) - 1) return;
+        memcpy(ctx->buffer + ctx->len, data, len);
+        ctx->len += len;
+        ctx->buffer[ctx->len] = '\0';
 
-
-    pumpClient.onData([](void* arg, AsyncClient* client, void* data, size_t len)
-    {
-        if (pumpCtx.len + len >= sizeof(pumpCtx.buffer))
-            return;
-
-        memcpy(pumpCtx.buffer + pumpCtx.len, data, len);
-        pumpCtx.len += len;
-        pumpCtx.buffer[pumpCtx.len] = 0;
-
-        char* jsonStart = strchr(pumpCtx.buffer, '{');
-        char* jsonEnd = strrchr(pumpCtx.buffer, '}');
-
-        if (jsonStart && jsonEnd)
-        {
-            StaticJsonDocument<128> doc;
-
-            if (deserializeJson(doc, jsonStart) == DeserializationError::Ok)
-            {
+        char* jsonStart = strchr(ctx->buffer, '{');
+        char* jsonEnd   = strrchr(ctx->buffer, '}');
+        if (jsonStart && jsonEnd && jsonEnd > jsonStart) {
+            StaticJsonDocument<128> doc; // sufficient for {"POWER":"ON/OFF"}
+            if (deserializeJson(doc, jsonStart) == DeserializationError::Ok) {
                 const char* state = doc["POWER"];
-                pumpCtx.responseReceived = true;
+                if (state) {
+                    strncpy(ctx->lastKnownState, state, sizeof(ctx->lastKnownState) - 1);
+                    ctx->responseReceived = true;
+                }
             }
         }
+    }, &pumpCtx);
 
-    }, NULL);
+    pumpClient.onDisconnect([](void* arg, AsyncClient* client) {
+        PumpContext* ctx = (PumpContext*)arg;
+        ctx->requestInProgress = false;
+        ctx->len = 0;
+    }, &pumpCtx);
 
-
-    pumpClient.onDisconnect([](void* arg, AsyncClient* client)
-    {
-        pumpCtx.requestInProgress = false;
-        pumpCtx.len = 0;
-    }, NULL);
-
-
-    pumpClient.onError([](void* arg, AsyncClient* client, int8_t error)
-    {
-        pumpCtx.requestInProgress = false;
-    }, NULL);
-
-
-    pumpClient.connect(PUMP_IP, RELAY_PORT);
+    pumpClient.onError([](void* arg, AsyncClient* client, int8_t error) {
+        PumpContext* ctx = (PumpContext*)arg;
+        ctx->requestInProgress = false;
+        ctx->retryAfter = millis() + 2000;
+    }, &pumpCtx);
 }
 
+void pumpRequest(const char* command) {
+    static bool initialized = false;
+    if (!initialized) {
+        initPumpClient();
+        initialized = true;
+    }
+    if (pumpCtx.requestInProgress || WiFi.status() != WL_CONNECTED) return;
+    strncpy(pumpCtx.command, command, sizeof(pumpCtx.command) - 1);
+    pumpCtx.command[sizeof(pumpCtx.command) - 1] = '\0';
+    pumpCtx.requestInProgress = true;
+    pumpCtx.responseReceived = false;
+    pumpCtx.len = 0;
+    pumpClient.connect(PUMP_IP, RELAY_PORT);
+}
 
 
 void turnOnPumpAsync()

@@ -1,80 +1,70 @@
 #include "fetchtank.h"
 
+TankContext tankCtx;
 
-struct TankClientContext {
-  AsyncClient* client;
-  String responseBuffer;
-  bool isClosed = false;
-};
 
+void initTankClient() {
+    tankCtx.client.onConnect([](void* arg, AsyncClient* c) {
+        char request[128];
+        snprintf(request, sizeof(request),
+            "GET /cm?cmnd=Status%%2010 HTTP/1.1\r\n"
+            "Host: %s\r\n"
+            "Connection: close\r\n\r\n",
+            TANK_IP);
+        c->write(request);
+    }, nullptr);
+
+    tankCtx.client.onData([](void* arg, AsyncClient* c, void* data, size_t len) {
+        if (tankCtx.len + len >= sizeof(tankCtx.buffer) - 1) return;
+        memcpy(tankCtx.buffer + tankCtx.len, data, len);
+        tankCtx.len += len;
+        tankCtx.buffer[tankCtx.len] = '\0';
+
+        char* jsonStart = strchr(tankCtx.buffer, '{');
+        char* jsonEnd   = strrchr(tankCtx.buffer, '}');
+        if (jsonStart && jsonEnd && jsonEnd > jsonStart) {
+            StaticJsonDocument<768> doc;
+            if (deserializeJson(doc, jsonStart) == DeserializationError::Ok) {
+
+                // ── Flow rate ──────────────────────────────────────
+                uint32_t newCount = doc["StatusSNS"]["COUNTER"]["C1"] | 0;
+                static uint32_t prevCount = 0;
+                if (newCount >= prevCount) {  // guard against counter reset
+                    currentLPM = (float)(newCount - prevCount) * 60.0f / 56.0f;
+                }
+                prevCount = newCount;
+
+                // ── Water level switches ───────────────────────────
+                char key[12];
+                for (int i = 0; i < 8; i++) {
+                    snprintf(key, sizeof(key), "Switch%d", i + 1);
+                    const char* state = doc["StatusSNS"][key] | "ON";
+                    waterLevel[i] = (strcmp(state, "OFF") == 0) ? 0 : 1;
+                }
+                tank_full = waterLevel[7];
+            }
+        }
+    }, nullptr);
+
+    tankCtx.client.onDisconnect([](void* arg, AsyncClient* c) {
+        tankCtx.requestInProgress = false;
+        tankCtx.len = 0;
+        tankCtx.readyForNext = true;
+    }, nullptr);
+
+    tankCtx.client.onError([](void* arg, AsyncClient* c, int8_t error) {
+        tankCtx.requestInProgress = false;
+        tankCtx.len = 0;
+        tankCtx.retryAfter = millis() + 2000;
+    }, nullptr);
+
+    tankCtx.initialized = true;
+}
 
 void fetchtank() {
-  static bool requestInProgress = false;
-  if (requestInProgress) return;
-  if (WiFi.status() != WL_CONNECTED)
-    return;
-
-  requestInProgress = true;
-  String hostTank = String(TANK_IP);
-  uint16_t port = 80;
-  String requestTank = String("GET /cm?cmnd=Status%2010 HTTP/1.1\r\nHost: ") + hostTank + "\r\nConnection: close\r\n\r\n";
-
-  TankClientContext* ctx = new TankClientContext();
-  ctx->client = new AsyncClient();
-
-  ctx->client->onConnect([ctx, requestTank](void* arg, AsyncClient* c) {
-    if (c->space() > requestTank.length()) {
-      c->write(requestTank.c_str());
-    }
-  }, nullptr);
-
-  ctx->client->onData([ctx](void* arg, AsyncClient* c, void* data, size_t len) {
-    String chunk = String((char*)data).substring(0, len);
-    ctx->responseBuffer += chunk; // accumulate response chunks
-
-    int jsonStart = ctx->responseBuffer.indexOf('{');
-    int jsonEnd = ctx->responseBuffer.lastIndexOf('}');
-    if (jsonStart >= 0 && jsonEnd > jsonStart) {
-      String jsonStr = ctx->responseBuffer.substring(jsonStart, jsonEnd + 1);
-      DynamicJsonDocument doc(1024);
-      DeserializationError err = deserializeJson(doc, jsonStr);
-      if (!err) {
-        uint32_t newCount = doc["StatusSNS"]["COUNTER"]["C1"] | 0;
-        static uint32_t prevCount = 0;
-        currentLPM = (float)(newCount - prevCount) * 60.0 / 56;
-        prevCount = newCount;
-        for (int i = 0; i < 8; i++) {
-          String key = "Switch" + String(i + 1);
-          String state = doc["StatusSNS"][key] | String("ON");
-          waterLevel[i] = (state == "OFF") ? 0 : 1;
-        }
-        tank_full = waterLevel[7];
-      }
-    }
-  }, nullptr);
-
-  ctx->client->onError([ctx](void* arg, AsyncClient* c, int8_t error) {
-    if (!ctx->isClosed) {
-      ctx->isClosed = true;
-      c->close();
-      delete ctx->client;
-      delete ctx;
-      requestInProgress = false;
-    }
-  }, nullptr);
-
-  ctx->client->onDisconnect([ctx](void* arg, AsyncClient* c) {
-    if (!ctx->isClosed) {
-      ctx->isClosed = true;
-      delete ctx->client;
-      delete ctx;
-      requestInProgress = false;
-    }
-  }, nullptr);
-
-  if (!ctx->client->connect(hostTank.c_str(), port)) {
-    delete ctx->client;
-    delete ctx;
-    requestInProgress = false;
-  }
+    if (WiFi.status() != WL_CONNECTED) return;
+    if (!tankCtx.initialized) initTankClient();
+    tankCtx.requestInProgress = true;
+    tankCtx.len = 0;
+    tankCtx.client.connect(TANK_IP, 80);
 }

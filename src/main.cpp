@@ -14,9 +14,7 @@
 #include "checkpumpdryrunprotection.h"
 #include "checkpumpoverloadprotection.h"
 #include "webserver.h"
-
-
-
+#include "beep.h"
 
 void setup()
 { 
@@ -127,28 +125,49 @@ void loop()
       is_redraw = 0;
     }
   } else {
-    static unsigned long lastFetchTank = 0;
-    static unsigned long lastFetchPlug = 0;
+    
     unsigned long now = millis();
 
-    if (now - lastFetchTank >= 1000) {
-      fetchtank();
-      lastFetchTank = now;
+    if (!relayCtx.requestInProgress) {
+    if (relayCtx.readyForNext || 
+       (relayCtx.retryAfter > 0 && now >= relayCtx.retryAfter)) {
+        relayCtx.readyForNext = false;
+        relayCtx.retryAfter = 0;
+        fetchplug();
     }
-    if (now - lastFetchPlug >= 1000) {
-      fetchplug();
-      lastFetchPlug = now;
+}
+
+if (!energyCtx.requestInProgress) {
+    if (energyCtx.readyForNext || 
+       (energyCtx.retryAfter > 0 && now >= energyCtx.retryAfter)) {
+        energyCtx.readyForNext = false;
+        energyCtx.retryAfter = 0;
+        fetchplugEnergy();
     }
+}
+
+if (!tankCtx.requestInProgress) {
+    if (tankCtx.readyForNext || 
+       (tankCtx.retryAfter > 0 && now >= tankCtx.retryAfter)) {
+        tankCtx.readyForNext = false;
+        tankCtx.retryAfter = 0;
+        fetchtank();
+    }
+}
+
+    
+
+    
    
       showDashboard();
       updateledstrip();
       checktankfullprotection();
       checkpumpdryrunprotection();
       checkpumpoverloadprotection();
+      handleBeep();
+      handleWebServer();
   }
-  
-  // Handle web server requests
-  handleWebServer();
+   
 }
 
 

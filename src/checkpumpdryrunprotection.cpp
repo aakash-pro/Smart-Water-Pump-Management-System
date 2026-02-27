@@ -5,6 +5,7 @@ void checkpumpdryrunprotection()
     static unsigned long dryRunDetectedTime = 0;
     static bool dryRunDelayActive = false;
     static unsigned long lastBeepTime = 0;
+    static bool dryRunProtectionTripped = false; // latch to prevent multiple shutdowns during same event
 
     // Calculate dry run threshold
     unsigned int dryRunThreshold =
@@ -13,7 +14,7 @@ void checkpumpdryrunprotection()
         dry_run_cutoff_power_3 * 10 +
         dry_run_cutoff_power_4;
 
-    if (dry_run_cutoff_protection && pump_running && power <= dryRunThreshold)
+    if (dry_run_cutoff_protection && pump_running && power < dryRunThreshold)
     {
         if (!dryRunDelayActive)
         {
@@ -22,21 +23,27 @@ void checkpumpdryrunprotection()
         }
 
         // Beep every 100ms during delay
-        if (dryRunDelayActive && (millis() - lastBeepTime >= 100))
+        if (dryRunDelayActive && !beepCtx.active && (millis() - lastBeepTime >= 100))
         {
             beep(40);
             lastBeepTime = millis();
         }
 
-        // Check delay timeout
         if (millis() - dryRunDetectedTime >= (unsigned long)dry_run_cutoff_delay * 1000)
         {
-            turnOffPumpAsync();
+            if (!dryRunProtectionTripped)
+            {
+                turnOffPumpAsync();
+                dryRunProtectionTripped = true;
+            }
             dryRunDelayActive = false;
         }
+
+        
     }
     else
     {
         dryRunDelayActive = false;
+        if (!pump_running) dryRunProtectionTripped = false;
     }
 }
