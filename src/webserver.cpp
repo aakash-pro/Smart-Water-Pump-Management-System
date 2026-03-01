@@ -1,5 +1,7 @@
 #include "webserver.h"
 
+ESP8266WebServer server(80);
+
 // ── Helper: Uptime ───────────────────────────────────────────────────
 void formatUptime(char* buf, size_t size) {
     unsigned long seconds = millis() / 1000;
@@ -18,8 +20,6 @@ int getSignalQuality(int rssi) {
 
 // ── Init Web Server ──────────────────────────────────────────────────
 void initWebServer() {
-
-    if (!LittleFS.begin()) return;
 
     // ── API: GET device info ─────────────────────────────────────────
     server.on("/api/device", HTTP_GET, []() {
@@ -247,9 +247,7 @@ void initWebServer() {
             server.send(200, "application/json", "{\"status\":\"resetting\"}");
             reset();
             server.client().flush();
-            
         }
-    
         else {
             server.send(400, "application/json", "{\"error\":\"Unknown command\"}");
         }

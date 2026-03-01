@@ -23,12 +23,17 @@ void initRelayClient() {
         relayCtx.buffer[relayCtx.len] = '\0';
 
         char* jsonStart = strchr(relayCtx.buffer, '{');
-        char* jsonEnd   = strrchr(relayCtx.buffer, '}');
-        if (jsonStart && jsonEnd && jsonEnd > jsonStart) {
-            StaticJsonDocument<256> doc;
-            if (deserializeJson(doc, jsonStart) == DeserializationError::Ok) {
-                const char* state = doc["StatusSTS"]["POWER"];
-                if (state) pump_running = (strcmp(state, "ON") == 0) ? 1 : 0;
+        if (jsonStart) {
+            StaticJsonDocument<768> doc;
+            DeserializationError error = deserializeJson(doc, jsonStart);
+            if (error == DeserializationError::Ok) {
+                if (doc.containsKey("StatusSTS")) {
+                    JsonObject statusSts = doc["StatusSTS"];
+                    if (statusSts.containsKey("POWER")) {
+                        const char* state = statusSts["POWER"];
+                        pump_running = (strcasecmp(state, "ON") == 0) ? 1 : 0;
+                    }
+                }
             }
         }
     }, nullptr);
@@ -67,21 +72,22 @@ void initEnergyClient() {
         energyCtx.buffer[energyCtx.len] = '\0';
 
         char* jsonStart = strchr(energyCtx.buffer, '{');
-        char* jsonEnd   = strrchr(energyCtx.buffer, '}');
-        if (jsonStart && jsonEnd && jsonEnd > jsonStart) {
+        if (jsonStart) {
             StaticJsonDocument<768> doc;
             if (deserializeJson(doc, jsonStart) == DeserializationError::Ok) {
-                JsonObject energy = doc["StatusSNS"]["ENERGY"];
-                if (!energy.isNull()) {
-                    power          = energy["Power"]         | 0.0f;
-                    voltage        = energy["Voltage"]       | 0.0f;
-                    current        = energy["Current"]       | 0.0f;
-                    ApparentPower  = energy["ApparentPower"] | 0.0f;
-                    ReactivePower  = energy["ReactivePower"] | 0.0f;
-                    PowerFactor    = energy["Factor"]        | 0.0f;
-                    TotalEnergy    = energy["Total"]         | 0.0f;
-                    yesterdayEnergy= energy["Yesterday"]     | 0.0f;
-                    todayEnergy    = energy["Today"]         | 0.0f;
+                if (doc.containsKey("StatusSNS")) {
+                    JsonObject energy = doc["StatusSNS"]["ENERGY"];
+                    if (!energy.isNull()) {
+                        power          = energy["Power"]         | 0.0f;
+                        voltage        = energy["Voltage"]       | 0.0f;
+                        current        = energy["Current"]       | 0.0f;
+                        ApparentPower  = energy["ApparentPower"] | 0.0f;
+                        ReactivePower  = energy["ReactivePower"] | 0.0f;
+                        PowerFactor    = energy["Factor"]        | 0.0f;
+                        TotalEnergy    = energy["Total"]         | 0.0f;
+                        yesterdayEnergy= energy["Yesterday"]     | 0.0f;
+                        todayEnergy    = energy["Today"]         | 0.0f;
+                    }
                 }
             }
         }
@@ -108,6 +114,7 @@ void fetchplug() {
     if (!relayCtx.initialized) initRelayClient();
     relayCtx.requestInProgress = true;
     relayCtx.len = 0;
+    memset(relayCtx.buffer, 0, sizeof(relayCtx.buffer)); 
     relayCtx.client.connect(PUMP_IP, PLUG_PORT);
 }
 
@@ -116,5 +123,6 @@ void fetchplugEnergy() {
     if (!energyCtx.initialized) initEnergyClient();
     energyCtx.requestInProgress = true;
     energyCtx.len = 0;
+    memset(energyCtx.buffer, 0, sizeof(energyCtx.buffer)); 
     energyCtx.client.connect(PUMP_IP, PLUG_PORT);
 }

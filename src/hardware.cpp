@@ -8,4 +8,3 @@ NTPClient timeClient(ntpUDP, "asia.pool.ntp.org", 19800, 60000);
 Adafruit_NeoPixel strip(8, D3, NEO_GRB + NEO_KHZ800);
 RTC_PCF8563 rtc;
 WiFiManager wm;
-ESP8266WebServer server(80);

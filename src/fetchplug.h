@@ -8,10 +8,10 @@
 struct RelayContext {
     AsyncClient client;
     bool requestInProgress = false;
-    bool initialized = false;
-    char buffer[256] = {0};
-    bool readyForNext = true;
+    bool initialized       = false;
+    bool readyForNext      = true;
     unsigned long retryAfter = 0;
+    char buffer[768] = {0}; 
     size_t len = 0;
 };
 
@@ -20,7 +20,7 @@ struct EnergyContext {
     AsyncClient client;
     bool requestInProgress = false;
     bool initialized = false;
-    char buffer[768] = {0};  // larger — Status 10 response is bigger
+    char buffer[768] = {0}; 
     bool readyForNext = true;
     unsigned long retryAfter = 0;
     size_t len = 0;

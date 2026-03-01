@@ -4,7 +4,7 @@ void checkpumpdryrunprotection()
 {
     static unsigned long dryRunDetectedTime = 0;
     static bool dryRunDelayActive = false;
-    static unsigned long lastBeepTime = 0;
+    static unsigned long dryRunLastBeepTime = 0;
     static bool dryRunProtectionTripped = false; // latch to prevent multiple shutdowns during same event
 
     // Calculate dry run threshold
@@ -23,10 +23,10 @@ void checkpumpdryrunprotection()
         }
 
         // Beep every 100ms during delay
-        if (dryRunDelayActive && !beepCtx.active && (millis() - lastBeepTime >= 100))
+        if (dryRunDelayActive && !beepCtx.active && (millis() - dryRunLastBeepTime >= 100))
         {
             beep(40);
-            lastBeepTime = millis();
+            dryRunLastBeepTime = millis();
         }
 
         if (millis() - dryRunDetectedTime >= (unsigned long)dry_run_cutoff_delay * 1000)

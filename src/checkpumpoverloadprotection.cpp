@@ -4,7 +4,7 @@ void checkpumpoverloadprotection()
 {
   static unsigned long overloadDetectedTime = 0;
   static bool overloadDelayActive = false;
-  static unsigned long lastBeepTime = 0;
+  static unsigned long overloadLastBeepTime = 0;
   static bool overloadProtectionTripped = false;
 
   unsigned int overloadThreshold =
@@ -21,10 +21,10 @@ void checkpumpoverloadprotection()
       overloadDelayActive = true;
     }
 
-    if (overloadDelayActive && !beepCtx.active && (millis() - lastBeepTime >= 100))
+    if (overloadDelayActive && !beepCtx.active && (millis() - overloadLastBeepTime >= 100))
     {
       beep(40);
-      lastBeepTime = millis();
+      overloadLastBeepTime = millis();
     }
 
     if (millis() - overloadDetectedTime >= (unsigned long)overload_cutoff_delay * 1000)

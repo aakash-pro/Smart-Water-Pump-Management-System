@@ -48,7 +48,6 @@ void setup()
   u8g2.setFontMode(1);
   mui.begin(u8g2, fds_data, muif_list, sizeof(muif_list) / sizeof(muif_t));
   loadValuesFromEEPROM();
-
   initialization();
   initWebServer();
 }
@@ -129,51 +128,65 @@ void loop()
       is_redraw = 0;
     }
     handleBeep();
+    yield();
   }
   else
   {
 
     unsigned long now = millis();
 
-    if (!relayCtx.requestInProgress)
-    {
-      if (relayCtx.readyForNext ||
-          (relayCtx.retryAfter > 0 && now >= relayCtx.retryAfter))
-      {
-        relayCtx.readyForNext = false;
-        relayCtx.retryAfter = 0;
-        fetchplug();
-      }
-    }
+    // ── Fetch throttle intervals ──────────────────────────────
+        static unsigned long lastRelayFetch  = 0;
+        static unsigned long lastEnergyFetch = 0;
+        static unsigned long lastTankFetch   = 0;
 
-    if (!energyCtx.requestInProgress)
-    {
-      if (energyCtx.readyForNext ||
-          (energyCtx.retryAfter > 0 && now >= energyCtx.retryAfter))
-      {
-        energyCtx.readyForNext = false;
-        energyCtx.retryAfter = 0;
-        fetchplugEnergy();
-      }
-    }
+        
+        if (!relayCtx.requestInProgress) {
+            if ((relayCtx.readyForNext || (relayCtx.retryAfter > 0 && now >= relayCtx.retryAfter))
+                && (now - lastRelayFetch >= 800)) {
+                relayCtx.readyForNext = false;
+                relayCtx.retryAfter  = 0;
+                lastRelayFetch       = now;
+                fetchplug();
+            }
+        }
 
-    if (!tankCtx.requestInProgress)
-    {
-      if (tankCtx.readyForNext ||
-          (tankCtx.retryAfter > 0 && now >= tankCtx.retryAfter))
-      {
-        tankCtx.readyForNext = false;
-        tankCtx.retryAfter = 0;
-        fetchtank();
-      }
-    }
+       
+        if (!energyCtx.requestInProgress) {
+            if ((energyCtx.readyForNext || (energyCtx.retryAfter > 0 && now >= energyCtx.retryAfter))
+                && (now - lastEnergyFetch >= 500)) {
+                energyCtx.readyForNext = false;
+                energyCtx.retryAfter   = 0;
+                lastEnergyFetch        = now;
+                fetchplugEnergy();
+            }
+        }
 
-    showDashboard();
-    updateledstrip();
+        
+        if (!tankCtx.requestInProgress) {
+            if ((tankCtx.readyForNext || (tankCtx.retryAfter > 0 && now >= tankCtx.retryAfter))
+                && (now - lastTankFetch >= 1000)) {
+                tankCtx.readyForNext = false;
+                tankCtx.retryAfter   = 0;
+                lastTankFetch        = now;
+                fetchtank();
+            }
+        }
+
+        // ── Display — throttled ───────────────────────────────────
+        static unsigned long lastDisplay = 0;
+        if (now - lastDisplay >= 100) {
+            showDashboard();
+            updateledstrip();
+            lastDisplay = now;
+        }
+    
     checktankfullprotection();
     checkpumpdryrunprotection();
     checkpumpoverloadprotection();
     handleBeep();
     handleWebServer();
   }
+  
+  
 }

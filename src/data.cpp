@@ -29,7 +29,7 @@ float currentLPM = 0.0;
 uint8_t tank_full = 0;
 uint8_t waterLevel[8] = {0};
 /////////Plug data////////
-uint8_t pump_running = 0;
+uint8_t pump_running = 1;
 float power = 0.0;
 float voltage = 0.0;
 float current = 0.0;

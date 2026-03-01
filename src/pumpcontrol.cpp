@@ -27,12 +27,13 @@ void initPumpClient() {
         char* jsonStart = strchr(ctx->buffer, '{');
         char* jsonEnd   = strrchr(ctx->buffer, '}');
         if (jsonStart && jsonEnd && jsonEnd > jsonStart) {
-            StaticJsonDocument<128> doc; // sufficient for {"POWER":"ON/OFF"}
+            StaticJsonDocument<128> doc;
             if (deserializeJson(doc, jsonStart) == DeserializationError::Ok) {
-                const char* state = doc["POWER"];
-                if (state) {
+                const char* state = doc["POWER"] | "";
+                if (*state) {  // Check if not empty
                     strncpy(ctx->lastKnownState, state, sizeof(ctx->lastKnownState) - 1);
                     ctx->responseReceived = true;
+                    
                 }
             }
         }
@@ -63,6 +64,7 @@ void pumpRequest(const char* command) {
     pumpCtx.requestInProgress = true;
     pumpCtx.responseReceived = false;
     pumpCtx.len = 0;
+    memset(pumpCtx.buffer, 0, sizeof(pumpCtx.buffer));  // Clear buffer before new request
     pumpClient.connect(PUMP_IP, RELAY_PORT);
 }
 
